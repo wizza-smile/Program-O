@@ -2,7 +2,7 @@
   /***************************************
   * http://www.program-o.com
   * PROGRAM O
-  * Version: 2.3.1
+  * Version: 2.4.2
   * FILE: index.php
   * AUTHOR: Elizabeth Perreau and Dave Morton
   * DATE: 02-15-2013
@@ -19,7 +19,7 @@
     $thisFile = __FILE__;
     require_once('../../config/global_config.php');
     if (!defined('SCRIPT_INSTALLED')) header('location: ' . _INSTALL_PATH_ . 'install_programo.php');
-    include_once (_LIB_PATH_ . "db_functions.php");
+    require_once(_LIB_PATH_ . 'PDO_functions.php');
     include_once (_LIB_PATH_ . "error_functions.php");
     ini_set('error_log', _LOG_PATH_ . 'debug.reader.error.log');
   }
@@ -40,13 +40,14 @@
   {
     $name = $postVars['name'];
     $pass = md5($postVars['pass']);
-    $con = db_open();
+    $dbConn = db_open();
     $sql = "select `password` from `myprogramo` where `user_name` = '$name' limit 1;";
-    $result = mysql_query($sql, $con) or die ('SQL error! Error:' . mysql_error());
-    $numRows = mysql_num_rows($result);
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+    $row = $sth->fetch();
+    $numRows = count($result);
     if ($numRows > 0)
     {
-      $row = mysql_fetch_assoc($result);
       $verify = $row['password'];
       if ($pass == $verify)
       {
@@ -56,7 +57,7 @@
       else $iframeURL = _LIB_URL_ . 'accessdenied.htm';
     }
     else echo 'No results found!';
-    mysql_free_result($result);
+    
   }
   if (!isset($_SESSION['isLoggedIn']) or $_SESSION['isLoggedIn'] === false)
   {

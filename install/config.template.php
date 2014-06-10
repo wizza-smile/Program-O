@@ -2,7 +2,7 @@
 /***************************************
 * http://www.program-o.com
 * PROGRAM O
-* Version: 2.3.1
+* Version: 2.4.2
 * FILE: config/global_config.php
 * AUTHOR: ELIZABETH PERREAU AND DAVE MORTON
 * DATE: January 16th, 2013
@@ -12,18 +12,16 @@
     // Paths - only set this manually if the below doesnt work
     //------------------------------------------------------------------------
 
-    chdir( dirname ( __FILE__ ) );
-    $thisConfigFolder = dirname( realpath( __FILE__ ) ) . DIRECTORY_SEPARATOR;
-    $thisConfigParentFolder = preg_replace( '~[/\\\\][^/\\\\]*[/\\\\]$~' , DIRECTORY_SEPARATOR , $thisConfigFolder);
+    $thisConfigFolder = __DIR__ . DIRECTORY_SEPARATOR;
+    chdir($thisConfigFolder);
+    $parentFolder = str_replace(DIRECTORY_SEPARATOR . 'config', '', $thisConfigFolder);
     $baseURL = 'http://' . $_SERVER['SERVER_NAME'] . $_SERVER['SCRIPT_NAME'];
     $docRoot = $_SERVER['DOCUMENT_ROOT'];
-
-    define('_BASE_DIR_', $thisConfigParentFolder);
+    define('_BASE_DIR_', $parentFolder);
     $path_separator = DIRECTORY_SEPARATOR;
-
     $thisFile = str_replace(_BASE_DIR_, '', $thisFile);
     $thisFile = str_replace($path_separator, '/', $thisFile);
-    $baseURL = str_replace($thisFile, '', $baseURL);
+    $baseURL  = str_replace($thisFile, '', $baseURL);
     define('_BASE_URL_', $baseURL);
 
     //------------------------------------------------------------------------

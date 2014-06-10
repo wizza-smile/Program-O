@@ -1,9 +1,9 @@
 <?php
 //-----------------------------------------------------------------------------------------------
-//My Program-O Version: 2.3.1
+//My Program-O Version: 2.4.2
 //Program-O  chatbot admin area
 //Written by Elizabeth Perreau and Dave Morton
-//Aug 2011
+//DATE: MAY 17TH 2014
 //for more information and support please visit www.program-o.com
 //-----------------------------------------------------------------------------------------------
 // members.php
@@ -99,15 +99,8 @@ endScript;
   $mainTitle         = str_replace('[helpLink]', $template->getSection('HelpLink'), $mainTitle);
 
 
-  function updateDB($sql) {
-    $dbConn = db_open();
-    if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception('You have a SQL error on line '. __LINE__ . ' of ' . __FILE__ . '. Error message is: ' . mysql_error() . ".<br />\nSQL = <pre>$sql</pre><br />\n");
-    $commit = mysql_affected_rows($dbConn);
-    return $commit;
-  }
-
   function save($action) {
-    global $dbn, $action, $post_vars;
+    global $dbConn, $dbn, $action, $post_vars;
     #return 'action = ' . $action;
     if (isset($post_vars['memberSelect'])) {
       $id = $post_vars['memberSelect'];
@@ -123,7 +116,7 @@ endScript;
     }
     switch ($action) {
       case 'Add':
-      $ip = (isset($_SERVER['REMOTE_HOST'])) ? $_SERVER['REMOTE_HOST'] : gethostbyaddr($_SERVER['REMOTE_ADDR']);
+      $ip = $_SERVER['REMOTE_ADDR'];
       $sql = "insert into myprogramo (id, user_name, password, last_ip, last_login) values (null, '$user_name', '$password','$ip', CURRENT_TIMESTAMP);";
       $out = "Account for $user_name successfully added!";
       break;
@@ -142,7 +135,16 @@ endScript;
       $sql = '';
       $out = '';
     }
-    $x = (!empty($sql)) ? updateDB($sql) : '';
+    //$x = (!empty($sql)) ? updateDB($sql) : '';
+    if (!empty($sql))
+    {
+      save_file(_LOG_PATH_ . 'memberSQL.txt', $sql);
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+      $affectedRows = $sth->rowCount();
+
+      //
+    }
     #return "action = $action<br />\n SQL = $sql";
     return $out;
   }
@@ -150,44 +152,45 @@ endScript;
 
 
     function getAdminsOpts() {
-    global $dbn;
+    global $dbn, $dbConn;
     $out = "                  <!-- Start List of Current Admin Accounts -->\n";
-    $dbConn = db_open();
     $optionTemplate = "                  <option value=\"[val]\">[key]</option>\n";
     $sql = 'SELECT id, user_name FROM myprogramo order by user_name;';
-    if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception(mysql_error());
-    while ($row = mysql_fetch_assoc($result)) {
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+    $result = $sth->fetchAll();
+    foreach ($result as $row) {
       $user_name = $row['user_name'];
       $id = $row['id'];
       $curOption = str_replace('[key]', $row['user_name'], $optionTemplate);
       $curOption = str_replace('[val]', $row['id'], $curOption);
       $out .= $curOption;
     }
-    mysql_close($dbConn);
+    
     $out .= "                  <!-- End List of Current Admin Accounts -->\n";
     return $out;
   }
 
   function getMemberData($id) {
     if ($id <= 0) return false;
-    global $dbn, $user_name, $id;
+    global $dbn, $user_name, $id, $dbConn;
     $sql = "select id, user_name from myprogramo where id = $id limit 1;";
-    $dbConn = db_open();
-    if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception(mysql_error());
-    $row = mysql_fetch_assoc($result);
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+    $row = $sth->fetch();
     $user_name = $row['user_name'];
     $id = $row['id'];
-    mysql_close($dbConn);
+    
   }
 
   function getNextID() {
-    global $dbn, $user_name;
+    global $dbn, $user_name, $dbConn;
     $sql = "select id from myprogramo order by id desc limit 1;";
-    $dbConn = db_open();
-    if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception(mysql_error());
-    $row = mysql_fetch_assoc($result);
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+    $row = $sth->fetch();
     $id = $row['id'];
-    mysql_close($dbConn);
+    
     return $id + 1;
   }
 

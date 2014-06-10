@@ -1,8 +1,8 @@
 /*
-My Program-O Version: 2.3.1
+My Program-O Version: 2.4.2
 Program-O  chatbot admin area
 Written by Elizabeth Perreau and Dave Morton
-Aug 2011
+DATE: MAY 17TH 2014
 for more information and support please visit www.program-o.com
 */
 html, body  {
@@ -23,7 +23,7 @@ body {
   overflow: hidden;
 }
 table td {vertical-align: top;}
-fieldset { border: 1px solid orange; padding: 12px; padding-left: 5px; padding-right: 5px; line-height: 125%;}
+fieldset { border: 1px solid orange; padding: 12px; padding-left: 5px; padding-right: 5px; line-height: 125%;border-radius:9px;}
 legend { font-weight: bold; font-size: xx-large; margin-left: -5px; margin-top: -15px; }
 label { cursor: pointer; margin-right: 20px; }
 div.row { clear: both; padding-top: 8px; border: none; width: 95%; margin-left: auto; margin-right: auto; min-height: 2em;}
@@ -71,16 +71,21 @@ span.eightyPercent textarea.wide { width: 67%; min-height: 150px; margin: 0; flo
 .narrow { padding-left: 0; float: left;width: 25%;text-align: left; border: 1px dashed blue;}
 .closeButton {
   position: absolute;
-  top: 3px;
+  top: 6px;
   right: 3px;
   width: 32px;
   height: 32px;
   background: url(images/closeButton.png) no-repeat;
   cursor: pointer;
+  border-radius: 3px;
 }
+.closeButton:hover {
+  background-position: 1px 1px;
+}
+
 .errMsg {
   min-width: 250px;
-  max-width: 95%;
+  max-width: 45%;
   min-height: 32px;
   max-height: 95%;
   width: auto;
@@ -89,17 +94,17 @@ span.eightyPercent textarea.wide { width: 67%; min-height: 150px; margin: 0; flo
   color: black;
   vertical-align: middle;
   text-align: center;
-  padding: 5px;
+  padding: 10px 40px 1px 10px;
   margin: 0 auto;
   display: none;
   overflow: auto;
-  border: 6px outset #933;
+  border: 3px outset #933;
   position: absolute;
   top: 15px;
   right: 15px;
   z-index: 99;
-  padding-right: 40px;
   overflow: auto;
+  border-radius: 12px;
 }
 .errMsgContent {
   overflow: auto;
@@ -272,7 +277,7 @@ span.eightyPercent textarea.wide { width: 67%; min-height: 150px; margin: 0; flo
   top: 160px;
   left: 25px;
   bottom: 70px;
-  width: 172px;
+  width: 217px;
   min-height: 25%;
   overflow: auto;
   margin: 0;
@@ -390,7 +395,7 @@ span.eightyPercent textarea.wide { width: 67%; min-height: 150px; margin: 0; flo
   position: absolute;
   top: 160px;
   bottom: 70px;
-  left: 205px;
+  left: 250px;
   right: 205px;
   background-color: transparent;
   background-color: #FFFFCC;
@@ -731,6 +736,10 @@ td input, td select {
   width: 95%;
   margin: 0 auto;
 }
+td input[type="checkbox"], input[type="radio"], td select {
+  width: auto !important;
+  margin: 0 auto;
+}
 .formTable {
   border: 1px solid orange;
   border: none;
@@ -782,4 +791,15 @@ blockquote.uncited {
 
 #report_submit {
   width: auto;
+}
+#pTitle {
+  text-align: center;
+}
+iframe {
+  border: none;
+  margin: 5px auto;
+  background-color: white;
+  min-height: 300px;
+  min-width: 80%;
+  display: block;
 }

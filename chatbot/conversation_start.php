@@ -3,25 +3,27 @@
   /***************************************
   * http://www.program-o.com
   * PROGRAM O
-  * Version: 2.3.1
+  * Version: 2.4.2
   * FILE: chatbot/conversation_start.php
   * AUTHOR: Elizabeth Perreau and Dave Morton
-  * DATE: 19 JUNE 2012
+  * DATE: MAY 17TH 2014
   * DETAILS: this file is the landing page for all calls to access the bots
   ***************************************/
 
   $time_start = microtime(true);
+  $script_start = $time_start;
   $last_timestamp = $time_start;
   $thisFile = __FILE__;
   require_once ("../config/global_config.php");
   //load shared files
-  include_once (_LIB_PATH_ . "db_functions.php");
+  require_once(_LIB_PATH_ . 'PDO_functions.php');
   include_once (_LIB_PATH_ . "error_functions.php");
   include_once(_LIB_PATH_ . 'misc_functions.php');
   ini_set('default_charset', $charset);
 
   //leave this first debug call in as it wipes any existing file for this session
   runDebug(__FILE__, __FUNCTION__, __LINE__, "Conversation Starting. Program O version " . VERSION, 0);
+  runDebug(__FILE__, __FUNCTION__, __LINE__, "OS: $os version $osv", 0);
   //load all the chatbot functions
   include_once (_BOTCORE_PATH_ . "aiml" . $path_separator . "load_aimlfunctions.php");
   //load all the user functions
@@ -38,7 +40,7 @@
   set_error_handler("myErrorHandler");
   $say = '';
   //open db connection
-  $con = db_open();
+  $dbConn = db_open();
   //initialise globals
   //$convoArr = array();
   $convoArr = intialise_convoArray($convoArr);
@@ -61,6 +63,8 @@
   session_start();
   #save_file(_LOG_PATH_ . 'session.txt', print_r($_SESSION, true));
   $debug_level = (isset($_SESSION['programo']['conversation']['debug_level'])) ? $_SESSION['programo']['conversation']['debug_level'] : $debug_level;
+  $debug_level = (isset($form_vars['debug_level'])) ? $form_vars['debug_level'] : $debug_level;
+  $debug_mode = (isset($form_vars['debug_mode'])) ? $form_vars['debug_mode'] : $debug_mode;
   if (isset($form_vars['convo_id'])) session_id($form_vars['convo_id']);
   $convo_id = session_id();
   #file_put_contents(_LOG_PATH_ . 'session_id.txt', session_id());
@@ -76,8 +80,13 @@
       $_SESSION = array();
       $user_id = (isset($convoArr['conversation']['user_id'])) ? $convoArr['conversation']['user_id'] : -1;
       $sql = "delete from `$dbn`.`client_properties` where `user_id` = $user_id;";
-      $result = db_query($sql, $con);
-      $numRows = mysql_affected_rows();
+      
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+
+
+
+      $numRows = $sth->rowCount();
       $convoArr['client_properties'] = null;
       $convoArr['conversation'] = null;
       $convoArr['conversation']['user_id'] = $user_id;
@@ -93,14 +102,22 @@
       // Update the users table, and clear out any unused client properties as needed
       $sql = "update `$dbn`.`users` set `session_id` = '$new_convo_id' where `session_id` = '$old_convo_id';";
       runDebug(__FILE__, __FUNCTION__, __LINE__, "Update user - SQL:\n$sql", 3);
-      $result = db_query($sql, $con);
-      $confirm = mysql_affected_rows($con);
+      
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+
+      $confirm = $sth->rowCount();
       // Get user id, so that we can clear the client properties
       $sql = "select `id` from `$dbn`.`users` where `session_id` = '$new_convo_id' limit 1;";
-      $result = db_query($sql, $con) or trigger_error('Cannot obtain user ID. Error = ' . mysql_error());
-      if ($result !== false)
+      
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+      $row = $sth->fetch();
+
+
+
+      if ($row !== false)
       {
-        $row = mysql_fetch_assoc($result);
         $user_id = $row['id'];
         $convoArr['conversation']['user_id'] = $user_id;
         $convoArr['conversation']['convo_id'] = $new_convo_id;
@@ -108,7 +125,7 @@
         $sql = "delete from `$dbn`.`client_properties` where `user_id` = $user_id;";
         runDebug(__FILE__, __FUNCTION__, __LINE__, "Clear client properties from the DB - SQL:\n$sql", 4);
       }
-      mysql_free_result($result);
+      
       $say = "Hello";
     }
     //add any pre-processing addons
@@ -158,17 +175,18 @@
     //return the values to display
     $display = $convoArr['send_to_user'];
     $time_start = $convoArr['time_start'];
-    $time_end = microtime(true);
-    $time = round(($time_end - $time_start) * 1000,4);
     unset($convoArr['nounList']);
     $final_convoArr = $convoArr;
   }
   else
   {
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Conversation intialised waiting user", 2);
+    $convoArr['send_to_user'] = '';
   }
   runDebug(__FILE__, __FUNCTION__, __LINE__, "Closing Database", 2);
-  db_close($con);
+  $dbConn = db_close();
+  $time_end = microtime(true);
+  $time = number_format(round(($time_end - $script_start) * 1000,7), 3);
   display_conversation($convoArr);
   runDebug(__FILE__, __FUNCTION__, __LINE__, "Conversation Ending. Elapsed time: $time milliseconds.", 0);
   $convoArr = handleDebug($convoArr); // Make sure this is the last line in the file, so that all debug entries are captured.

@@ -3,10 +3,10 @@
   /***************************************
   * www.program-o.com
   * PROGRAM O
-  * Version: 2.3.1
+  * Version: 2.4.2
   * FILE: chatbot/core/aiml/parse_aiml.php
   * AUTHOR: Elizabeth Perreau and Dave Morton
-  * DATE: MAY 4TH 2011
+  * DATE: MAY 17TH 2014
   * DETAILS: this file contains the functions used to convert aiml to php
   ***************************************/
 
@@ -269,6 +269,7 @@
   function set_wildcards($convoArr)
   {
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Setting Wildcards", 2);
+    //save_file(_LOG_PATH_ . 'convoarr.txt', print_r($convoArr, true));
     $aiml_pattern = $convoArr['aiml']['pattern'];
     $ap = trim($aiml_pattern);
     $ap = str_replace("+", "\+", $ap);
@@ -361,9 +362,163 @@
   * @param string $now_look_for_this - the text to search for
   * @return string $srai_parsed_template - the result of the search
   **/
-  function run_srai(& $convoArr, $now_look_for_this)
+  function run_srai(&$convoArr, $now_look_for_this)
   {
-    global $srai_iterations, $error_response;
+    global $srai_iterations, $error_response, $dbConn, $dbn;
+    $bot_parent_id = $convoArr['conversation']['bot_parent_id'];
+    $bot_id = $convoArr['conversation']['bot_id'];
+    if ($bot_parent_id != 0 and $bot_parent_id != $bot_id)
+    {
+      $sql_bot_select = " (bot_id = '$bot_id' OR bot_id = '$bot_parent_id') ";
+    }
+    else
+    {
+      $sql_bot_select = " bot_id = '$bot_id' ";
+    }
+    $bot_id = $convoArr['conversation']['bot_id'];
+    runDebug(__FILE__, __FUNCTION__, __LINE__,'Checking for entries in the srai_lookup table.', 2);
+    runDebug(__FILE__, __FUNCTION__, __LINE__,"google bot_id = $bot_id", 2);
+    $lookingfor = $convoArr['aiml']['lookingfor'];
+    //$now_look_for_this = strtoupper($now_look_for_this);
+    $sql = "select `template_id` from `$dbn`.`srai_lookup` where `pattern` = '$now_look_for_this' and $sql_bot_select;";
+    runDebug(__FILE__, __FUNCTION__, __LINE__,"lookup SQL = $sql", 2);
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+    $row = $sth->fetchAll();
+    runDebug(__FILE__, __FUNCTION__, __LINE__,'Result = ' . print_r($row, true), 2);
+    $num_rows = count($row);
+    if ($num_rows > 0)
+    {
+      runDebug(__FILE__, __FUNCTION__, __LINE__,"Found $num_rows rows in lookup table: " . print_r($row, true), 2);
+      $template_id = $row[0]['template_id'];
+      runDebug(__FILE__, __FUNCTION__, __LINE__,"Found a matching entry in the lookup table. Using ID# $template_id.", 2);
+      $sql = "select `template` from `$dbn`.`aiml` where `id` = '$template_id';";
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+      $row = $sth->fetch();
+      runDebug(__FILE__, __FUNCTION__, __LINE__,"Row found in AIML for ID $template_id: " . print_r($row, true), 2);
+      if (!empty($row))
+      {
+        $template = add_text_tags($row['template']);
+        try
+        {
+          $sraiTemplate = new SimpleXMLElement($template, LIBXML_NOCDATA);
+        }
+        catch (exception $e)
+        {
+          trigger_error("There was a problem parsing the SRAI template as XML. Template value:\n$template", E_USER_WARNING);
+          $sraiTemplate = new SimpleXMLElement("<text>$error_response</text>", LIBXML_NOCDATA);
+        }
+        $responseArray = parseTemplateRecursive($convoArr, $sraiTemplate);
+        $response = implode_recursive(' ', $responseArray, __FILE__, __FUNCTION__, __LINE__);
+        runDebug(__FILE__, __FUNCTION__, __LINE__,"Returning results from stored srai lookup.", 2);
+        return $response;
+      }
+    }
+    else
+    {
+      runDebug(__FILE__, __FUNCTION__, __LINE__,'No match found in lookup table.', 2);
+    }
+      runDebug(__FILE__, __FUNCTION__, __LINE__,"Nothing found in the SRAI lookup table. Looking for a direct pattern match for '$now_look_for_this'.", 2);
+      $sql = "SELECT `id`, `bot_id`, `pattern`, `thatpattern`, `topic` FROM `$dbn`.`aiml` where `pattern` = :pattern and $sql_bot_select order by `id` asc;";
+      $sth = $dbConn->prepare($sql);
+      $sth->bindValue(':pattern', $now_look_for_this);
+      $sth->execute();
+      $result = $sth->fetchAll();
+      $num_rows = count($result);
+      runDebug(__FILE__, __FUNCTION__, __LINE__,"Found $num_rows potential responses.", 2);
+      $allrows = array();
+      $i = 0;
+      if (($result) && ($num_rows > 0))
+      {
+        $tmp_rows = number_format($num_rows);
+        runDebug(__FILE__, __FUNCTION__, __LINE__, "FOUND: ($num_rows) potential AIML matches", 2);
+        $tmp_content = date('H:i:s') . ": SQL:\n$sql\nRows = $tmp_rows\n\n";
+        //loop through results
+        foreach ($result as $row)
+        {
+          $row['aiml_id'] = $row['id'];
+          $row['score'] = 0;
+          $row['track_score'] = '';
+          $allrows[] = $row;
+
+          $mu = memory_get_usage(true);
+          if ($mu >= MEM_TRIGGER)
+          {
+            runDebug(__FILE__, __FUNCTION__, __LINE__,'Current operation exceeds memory threshold. Aborting data retrieval.', 0);
+            break;
+          }
+        }
+      }
+      else
+      {
+        runDebug(__FILE__, __FUNCTION__, __LINE__, "Error: FOUND NO AIML matches in DB", 1);
+        $allrows[$i]['aiml_id'] = "-1";
+        $allrows[$i]['bot_id'] = "-1";
+        $allrows[$i]['pattern'] = "no results";
+        $allrows[$i]['thatpattern'] = '';
+        $allrows[$i]['topic'] = '';
+      }
+      //unset all irrelvant matches
+      $allrows = unset_all_bad_pattern_matches($convoArr, $allrows, $now_look_for_this);
+      //score the relevant matches
+      $allrows = score_matches($convoArr, $allrows, $now_look_for_this);
+      //get the highest
+      $allrows = get_highest_scoring_row($convoArr, $allrows, $lookingfor);
+      if (isset($allrows['aiml_id']))
+      {
+        $sql = "select `template` from `$dbn`.`aiml` where `id` = :id limit 1;";
+        $sth = $dbConn->prepare($sql);
+        $aiml_id = $allrows['aiml_id'];
+        $pattern = $allrows['pattern'];
+        $sth->bindValue(':id', $aiml_id);
+        $sth->execute();
+        $row = $sth->fetch();
+        $sth->closeCursor();
+        $template = add_text_tags($row['template']);
+        try
+        {
+          $sraiTemplate = new SimpleXMLElement($template, LIBXML_NOCDATA);
+        }
+        catch (exception $e)
+        {
+          trigger_error("There was a problem parsing the SRAI template as XML. Template value:\n$template", E_USER_WARNING);
+          $sraiTemplate = new SimpleXMLElement("<text>$error_response</text>", LIBXML_NOCDATA);
+        }
+        $responseArray = parseTemplateRecursive($convoArr, $sraiTemplate);
+        $response = implode_recursive(' ', $responseArray, __FILE__, __FUNCTION__, __LINE__);
+        try
+        {
+          // code to try here
+        $sql = "insert into `$dbn`.`srai_lookup` (`id`, `bot_id`, `pattern`, `template_id`) values(null, :bot_id, :pattern, :template_id);";
+        $sth = $dbConn->prepare($sql);
+        $sth->bindValue(':bot_id', $bot_id);
+        $sth->bindValue(':pattern', $pattern);
+        $sth->bindValue(':template_id', $aiml_id);
+        $sth->execute();
+        $affectedRows = $sth->rowCount();
+        if ($affectedRows > 0) runDebug(__FILE__, __FUNCTION__, __LINE__,"Successfully inserted entry for '$pattern'.", 1);
+        }
+        catch(Exception $e)
+        {
+          //something to handle the problem here, usually involving $e->getMessage()
+          $err = $e->getMessage();
+          runDebug(__FILE__, __FUNCTION__, __LINE__,"Unable to insert entry for '$pattern'! Error = $err.", 1);
+          runDebug(__FILE__, __FUNCTION__, __LINE__,"SQL = $sql", 1);
+        }
+
+        //
+        runDebug(__FILE__, __FUNCTION__, __LINE__,"Returning results from stored srai lookup.", 2);
+        return $response;
+      }
+/*
+      $ar = print_r($allrows, true);
+      runDebug(__FILE__, __FUNCTION__, __LINE__, 'allrows = ' . $ar, 2);
+      $convoArr['send_to_user'] = $ar;
+      display_conversation($convoArr);
+      handleDebug($convoArr);
+      exit();
+*/
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Running SRAI $srai_iterations on $now_look_for_this", 3);
     runDebug(__FILE__, __FUNCTION__, __LINE__, $convoArr['aiml']['html_template'], 4);
     //number of srai iterations - will stop recursion if it is over 10
@@ -375,7 +530,7 @@
       $convoArr['aiml']['parsed_template'] = $error_response;
       return $error_response;
     }
-    $tmp_convoArr = array();
+    //$tmp_convoArr = array();
     $tmp_convoArr = $convoArr;
     if (!isset($tmp_convoArr['stack'])) $tmp_convoArr = load_blank_stack($tmp_convoArr);
     if (!isset($tmp_convoArr['topic']))
@@ -388,6 +543,8 @@
     //added
     $tmp_convoArr['aiml']['parsed_template'] = "";
     $tmp_convoArr['aiml']['lookingfor'] = $now_look_for_this;
+    $tmp_convoArr['aiml']['pattern'] = $now_look_for_this;
+    $tmp_convoArr['aiml']['thatpattern'] = $convoArr['aiml']['thatpattern'];
     $tmp_convoArr = get_aiml_to_parse($tmp_convoArr);
     $tmp_convoArr = parse_matched_aiml($tmp_convoArr, "srai");
     $srai_parsed_template = $tmp_convoArr['aiml']['parsed_template'];
@@ -451,23 +608,26 @@
   **/
   function make_learn($convoArr, $pattern, $template)
   {
-    global $con, $dbn;
+    global $dbConn, $dbn;
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Making learn", 2);
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Pattern:  $pattern", 2);
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Template: $template", 2);
     $pattern = normalize_text($pattern);
     $aiml = "<learn> <category> <pattern> <eval>$pattern</eval> </pattern> <template> <eval>$template</eval> </template> </category> </learn>";
-    $aiml = mysql_real_escape_string($aiml);
-    $pattern = mysql_real_escape_string($pattern . " ");
-    $template = mysql_real_escape_string($template . " ");
+    $aiml = $aiml;
+    $pattern = $pattern . " ";
+    $template = $template . " ";
     $u_id = $convoArr['conversation']['user_id'];
     $bot_id = $convoArr['conversation']['bot_id'];
     $sql = "INSERT INTO `$dbn`.`aiml_userdefined`
         VALUES
         (NULL, '$aiml','$pattern','$template','$u_id','$bot_id',NOW())";
     runDebug(__FILE__, __FUNCTION__, __LINE__, "Make learn SQL: $sql", 3);
-    $result = db_query($sql, $con);
-    $numRows = mysql_affected_rows($result);
+    
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+
+    $numRows = $sth->rowCount();
   }
 
   /**

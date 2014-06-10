@@ -1,39 +1,55 @@
 <?php
-//-----------------------------------------------------------------------------------------------
-//My Program-O Version: 2.3.1
-//Program-O  chatbot admin area
-//Written by Elizabeth Perreau and Dave Morton
-//Aug 2011
-//for more information and support please visit www.program-o.com
-//-----------------------------------------------------------------------------------------------
-// search.php
+  /***************************************
+    * http://www.program-o.com
+    * PROGRAM O
+    * Version: 2.4.2
+    * FILE: search.php
+    * AUTHOR: Elizabeth Perreau and Dave Morton
+    * DATE: 05-26-2014
+    * DETAILS: Search the AIML table of the DB for desired categories
+    ***************************************/
+
   $post_vars = filter_input_array(INPUT_POST);
   $get_vars = filter_input_array(INPUT_GET);
+  $form_vars = array_merge((array)$post_vars, (array)$get_vars);
 
+  $group = (isset($get_vars['group'])) ? $get_vars['group'] : 1;
 
   if((isset($post_vars['action']))&&($post_vars['action']=="search")) {
     $mainContent = $template->getSection('SearchAIMLForm');
     $mainContent .= runSearch();
+    $mainContent = str_replace('[group]', $group, $mainContent);
+  }
+  elseif((isset($get_vars['group']))) {
+    $mainContent = $template->getSection('SearchAIMLForm');
+    $mainContent .= runSearch();
+    $mainContent = str_replace('[group]', $group, $mainContent);
   }
   elseif((isset($post_vars['action']))&&($post_vars['action']=="update")) {
     $mainContent = $template->getSection('SearchAIMLForm');
     $mainContent .= updateAIML();
+    $mainContent = str_replace('[group]', $group, $mainContent);
   }
   elseif((isset($get_vars['action']))&&($get_vars['action']=="del")&&(isset($get_vars['id']))&&($get_vars['id']!="")) {
     $mainContent = $template->getSection('SearchAIMLForm');
     $mainContent .= delAIML($get_vars['id']);
+  $mainContent = str_replace('[group]', $group, $mainContent);
   }
   elseif((isset($get_vars['action']))&&($get_vars['action']=="edit")&&(isset($get_vars['id']))&&($get_vars['id']!="")) {
     $mainContent = $template->getSection('SearchAIMLForm');
     $mainContent .= editAIMLForm($get_vars['id']);
+  $mainContent = str_replace('[group]', $group, $mainContent);
   }
   else {
     $mainContent = $template->getSection('SearchAIMLForm');
+  $mainContent = str_replace('[group]', $group, $mainContent);
   }
+  $mainContent = str_replace('[group]', $group, $mainContent);
 
   $upperScripts = '<script type="text/javascript" src="scripts/tablesorter.min.js"></script>'."\n";
   $topNav        = $template->getSection('TopNav');
   $leftNav       = $template->getSection('LeftNav');
+  $rightNav      = $template->getSection('RightNav');
   $main          = $template->getSection('Main');
   $topNavLinks   = makeLinks('top', $topLinks, 12);
   $navHeader     = $template->getSection('NavHeader');
@@ -49,12 +65,14 @@
   $mainTitle     = 'Search/Edit AIML';
 
   function delAIML($id) {
-    
-    $dbConn = db_open();
+    global $dbConn;
     if($id!="") {
       $sql = "DELETE FROM `aiml` WHERE `id` = '$id' LIMIT 1";
-      if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception('You have a SQL error on line '. __LINE__ . ' of ' . __FILE__ . '. Error message is: ' . mysql_error() . ".<br />\nSQL = $sql<br />\n");
-      if(!$result) {
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+      $affectedRows = $sth->rowCount();
+
+      if($affectedRows == 0) {
         $msg = 'Error AIML couldn\'t be deleted - no changes made.</div>';
       }
       else {
@@ -64,32 +82,51 @@
     else {
       $msg = 'Error AIML couldn\'t be deleted - no changes made.';
     }
-    mysql_close($dbConn);
     return $msg;
   }
 
 
-  function runSearch() {
-    global $bot_id, $bot_name, $post_vars;
-    $dbConn = db_open();
+  function runSearch()
+  {
+    global $bot_id, $bot_name, $form_vars, $dbConn, $group;
+    //exit("group = $group");
     $i=0;
     $searchTermsTemplate = " like '[value]' or\n  ";
     $searchTerms = '';
-    $search_topic    = mysql_real_escape_string(trim($post_vars['search_topic']));
-    $search_filename = mysql_real_escape_string(trim($post_vars['search_filename']));
-    $search_pattern  = mysql_real_escape_string(trim($post_vars['search_pattern']));
-    $search_template = mysql_real_escape_string(trim($post_vars['search_template']));
-    $search_that     = mysql_real_escape_string(trim($post_vars['search_that']));
-    if(!empty($search_topic) or !empty($search_filename) or !empty($search_pattern) or !empty($search_template) or !empty($search_that)) {
-      $sql = "SELECT * FROM `aiml` WHERE `bot_id` = '$bot_id'  AND (\n  [searchTerms]\n) LIMIT 50;";
+    $search_fields = array('search_topic', 'search_filename','search_pattern','search_template','search_that');
+    $qs = '';
+    foreach ($search_fields as $index)
+    {
+      $$index = trim($form_vars[$index]);
+      if (!empty($form_vars[$index]))
+      {
+        $ue = urlencode($form_vars[$index]);
+        $qs .= "&amp;$index=$ue";
+      }
+    }
+    if(!empty($search_topic) or !empty($search_filename) or !empty($search_pattern) or !empty($search_template) or !empty($search_that))
+    {
+      $limit = ($group - 1) * 50;
+      $limit = ($limit < 0) ? 0 : $limit;
+      $sql = "SELECT * FROM `aiml` WHERE `bot_id` = '$bot_id'  AND (\n  [searchTerms]\n) order by id limit $limit, 50;";
       $searchTerms .= (!empty($search_topic)) ? '`topic`' . str_replace('[value]', $search_topic, $searchTermsTemplate) : '';
       $searchTerms .= (!empty($search_filename)) ? '`filename`' . str_replace('[value]', $search_filename, $searchTermsTemplate) : '';
       $searchTerms .= (!empty($search_pattern)) ? '`pattern`' . str_replace('[value]', $search_pattern, $searchTermsTemplate) : '';
       $searchTerms .= (!empty($search_template)) ? '`template`' . str_replace('[value]', $search_template, $searchTermsTemplate) : '';
       $searchTerms .= (!empty($search_that)) ? '`thatpattern`' . str_replace('[value]', $search_that, $searchTermsTemplate) : '';
       $searchTerms = rtrim($searchTerms, " or\n ");
+      $countSQL = "SELECT count(id) FROM `aiml` WHERE `bot_id` = '$bot_id'  AND (\n  [searchTerms]\n);";
+      $countSQL = str_replace('[searchTerms]', $searchTerms, $countSQL);
+      $sth = $dbConn->prepare($countSQL);
+      $sth->execute();
+      $row = $sth->fetch();
+      $resCount = paginate($row['count(id)'], $group, $qs);
       $sql = str_replace('[searchTerms]', $searchTerms, $sql);
-      if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception('You have a SQL error on line '. __LINE__ . ' of ' . __FILE__ . '. Error message is: ' . mysql_error() . ".<br />\nSQL = $sql<br />\n");
+      //trigger_error("SQL = $sql");
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+      $result = $sth->fetchAll();
+      $rowCount = count($result);
       $htmltbl = <<<endtHead
           <table width="99%" border="1" cellpadding="1" cellspacing="1">
             <thead>
@@ -104,7 +141,8 @@
             </thead>
             <tbody>
 endtHead;
-      while($row=mysql_fetch_assoc($result)) {
+      foreach ($result as $row)
+      {
         $i++;
         $topic = $row['topic'];
         $pattern = $row['pattern'];
@@ -132,34 +170,34 @@ endLink;
             </tr>
 endRow;
     }
-      mysql_close($dbConn);
-      $htmltbl .= "          </tbody>\n        </table>";
-      if($i == 50) {
-        $msg = "Found more than 50 results for your specified search terms. please refine your search further";
+        $htmltbl .= "          </tbody>\n        </table>";
+      if($i > 0)
+      {
+        //$msg = "Found more than 50 results for your specified search terms. please refine your search further";
+        $msg = $resCount;
       }
-      elseif($i == 0) {
+      else
+      {
         $msg = "Found 0 results for your specified search terms. please try again";
         $htmltbl="";
-      }
-      else {
-        $msg = "Found $i results for your specified search terms.";
       }
       $htmlresults = "<div id=\"pTitle\">$msg</div>".$htmltbl;
     }
     else {
       $htmlresults =  'Please enter a search term in any one of the available search boxes.';
     }
+    $htmlresults = str_replace('[group]', $group, $htmlresults);
     return $htmlresults;
   }
 
 
   function editAIMLForm($id) {
     //db globals
-    global $template;
-    $dbConn = db_open();
+    global $template, $dbConn, $group;
     $sql = "SELECT * FROM `aiml` WHERE `id` = '$id' LIMIT 1";
-    if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception('You have a SQL error on line '. __LINE__ . ' of ' . __FILE__ . '. Error message is: ' . mysql_error() . ".<br />\nSQL = $sql<br />\n");
-    $row=mysql_fetch_assoc($result);
+    $sth = $dbConn->prepare($sql);
+    $sth->execute();
+    $row = $sth->fetch();
     $topic = $row['topic'];
     $pattern = $row['pattern'];
     $thatpattern = $row['thatpattern'];
@@ -173,34 +211,74 @@ endRow;
     $form = str_replace('[thatpattern]', $thatpattern, $form);
     $form = str_replace('[template]', $row_template, $form);
     $form = str_replace('[filename]', $filename, $form);
-    mysql_close($dbConn);
+    $form = str_replace('[group]', $group, $form);
     return $form;
   }
 
   function updateAIML() {
-    global $post_vars;
-    $dbConn = db_open();
-    $template = mysql_real_escape_string(trim($post_vars['template']));
-    $filename = mysql_real_escape_string(trim($post_vars['filename']));
-    $pattern = (IS_MB_ENABLED) ? mb_strtoupper(mysql_real_escape_string(trim($post_vars['pattern']))) : strtoupper(mysql_real_escape_string(trim($post_vars['pattern'])));
-    $thatpattern = (IS_MB_ENABLED) ? mb_strtoupper(mysql_real_escape_string(trim($post_vars['thatpattern']))) : strtoupper(mysql_real_escape_string(trim($post_vars['thatpattern'])));
-    $topic = (IS_MB_ENABLED) ? mb_strtoupper(mysql_real_escape_string(trim($post_vars['topic']))) : strtoupper(mysql_real_escape_string(trim($post_vars['topic'])));
+    global $post_vars, $dbConn;
+    $template = trim($post_vars['template']);
+    $filename = trim($post_vars['filename']);
+    $pattern = (IS_MB_ENABLED) ? mb_strtoupper(trim($post_vars['pattern'])) : strtoupper(trim($post_vars['pattern']));
+    $thatpattern = (IS_MB_ENABLED) ? mb_strtoupper(trim($post_vars['thatpattern'])) : strtoupper(trim($post_vars['thatpattern']));
+    $topic = (IS_MB_ENABLED) ? mb_strtoupper(trim($post_vars['topic'])) : strtoupper(trim($post_vars['topic']));
     $id = trim($post_vars['id']);
     if(($template == "")||($pattern== "")||($id=="")) {
       $msg =  'Please make sure you have entered a user input and bot response ';
     }
     else {
       $sql = "UPDATE `aiml` SET `pattern` = '$pattern',`thatpattern`='$thatpattern',`template`='$template',`topic`='$topic',`filename`='$filename' WHERE `id`='$id' LIMIT 1";
-      if (($result = mysql_query($sql, $dbConn)) === false) throw new Exception('You have a SQL error on line '. __LINE__ . ' of ' . __FILE__ . '. Error message is: ' . mysql_error() . ".<br />\nSQL = $sql<br />\n");
-      if($result) {
+      $sth = $dbConn->prepare($sql);
+      $sth->execute();
+      $affectedRows = $sth->rowCount();
+      if($affectedRows > 0) {
         $msg =  'AIML Updated.';
       }
       else {
         $msg =  'There was an error updating the AIML - no changes made.';
       }
     }
-    mysql_close($dbConn);
     return $msg;
   }
 
-?>
+  function paginate($rowCount, $group, $qs) {
+    $row_count = number_format($rowCount);
+    $firstGroup = 1;
+    $prevGroup2 = $group - 2;
+    $prevGroup1 = $group - 1;
+    $curGroup   = $group;
+    $nextGroup1 = $group + 1;
+    $nextGroup2 = $group + 2;
+    $lastGroup = intval($rowCount / 50);
+    $remainder = ($rowCount / 50) - $lastGroup;
+    if ($remainder > 0) $lastGroup++;
+    $out = "Found $row_count Results. Displaying 50 rows per page: ";
+    $link = ' - <a class="paginate" href="index.php?page=search&amp;group=[group][qs]">[label]</a>';
+    $firstLink = ($group > 1) ? str_replace('[label]', 'First', $link) : 'First';
+    $firstLink = str_replace('[group]', 1, $firstLink);
+
+    $prevLink2 = ($prevGroup2 > 0) ? str_replace('[label]', $prevGroup2, $link) : '- ..';
+    $prevLink2 = str_replace('[group]', $prevGroup2, $prevLink2);
+
+    $prevLink1 = ($prevGroup1 > 0) ? str_replace('[label]', $prevGroup1, $link) : '- ..';
+    $prevLink = str_replace('[group]', $prevGroup, $prevLink);
+
+    $curLink   = str_replace('[label]', "<b>$curGroup</b>", $link);
+    $curLink   = str_replace('[group]', $curGroup, $curLink);
+
+    $nextLink1 = ($nextGroup1 < $lastGroup) ? str_replace('[label]', $nextGroup1, $link) : '- ..';
+    $nextLink1 = str_replace('[group]', $nextGroup1, $nextLink1);
+
+    $nextLink2 = ($nextGroup2 < $lastGroup) ? str_replace('[label]', $nextGroup2, $link) : '- ..';
+    $nextLink2 = str_replace('[group]', $nextGroup2, $nextLink2);
+
+    $lastLink  = ($group < $lastGroup) ? $link : 'Last';
+    $lastLink = str_replace('[label]', 'Last', $lastLink);
+    $lastLink  = str_replace('[group]', $lastGroup, $lastLink);
+
+    $out .= "$firstLink\n$prevLink2\n$prevLink1\n$curLink\n$nextLink1\n$nextLink2\n$lastLink\n";
+    $out = str_replace('[qs]', $qs, $out);
+    return "$out <!-- group = $group -->";
+  }
+
+

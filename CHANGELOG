@@ -1,19 +1,56 @@
   /***************************************
   * http://www.program-o.com
   * PROGRAM O
-  * Version: 2.3.1
+  * Version: 2.4.2
   * FILE: CHANGELOG
   * AUTHOR: Elizabeth Perreau and Dave Morton
-  * DATE: 11-05-2013
+  * DATE: MAY 17TH 2014
   * DETAILS: Describes the version changes in Program O
   ***************************************/
 
 Version History:
+2.4.2   Added Local AIML Validation and SRAI Lookup Admin
+            1.) Added a "local" AIML validator script, specifically designed to validate
+                AIML files for Program O and Pandorabots.
+            2.) Added a new page to the admin to work with the new SRAI lookup table. For
+                now, the page only fills the lookup table with direct matches to existing
+                SRAI calls within the AIML table, but soon it will also include functionality
+                for searching the lookup table, finding "inderect match" patterns, and the
+                ability to edit the templates for matched SRAI calls.
+            3.) Several minor bug fixes, including one that limited the number of characters
+                that the admin username could have (without any warning of the limit). The
+                new limit is 255 characters, instead of the previous 10.
+2.4.1   Complete refactor for PDO support, added SRAI lookup
+            1.) Refactored the code that deals with DB access to completely remove the
+                last of the mysql_* functions, including "fallback support".
+            2.) Added an additional table to the database to handle looking up previously
+                used calls to <srai> tags. This will improve performance in the future,
+                in that if an <srai> tag is stored in the lookup table, the script doesn't
+                have to run through the entire AIML table to find it. If a suitable srai
+                category is found that isn't already in the lookup table, it's added for
+                future use. While the table is being added now, the feature is not yet
+                enabled. We'll be enabling it in the near future, once further testing is
+                completed.
+2.4.0   Conditional PDO support added, major bug fixes
+            1.) Added PDO support for PHP versions that support it (and have it enabled),
+            with a fallback to the original MySQL functions if no PDO support is detected
+            2.) Finally found the problem with template-side <that> tags not being displayed
+                correctly. Special thanks to Tom (AKA Slow Putzo) for the assist with this!
+            3.) Also fixed the long-standing bug with pattern-side <that> tags not being
+                scored and chosen correctly. Once again, Thanks Tom! :D
+            4.) Removed the DB stats page from the admin. It was more or less a failed
+                experiment, and really needed to be removed.
+            5.) Also removed the scripts to upgrade from version 2.0 to 2.3 - If you have any
+                version of Program O that's older than 2.3.1, you need to do a fresh install
+                and more or less start from scratch. Sorry, but that's just the way it is.
+            6.) Other miscellaneous, minor bug fixes, mainly dealing with unnecessary error
+                log entries.
+
 2.3.1   Bug fixes, repaired missing table columns
             1.) Corrected a bug in the function parse_learn_tag that prevented new data from being
                 inserted into the aiml_userdefined table
-            2.) Added a column in the aiml_userdefined table that was missing, which was also preventing
-                new data from being  added
+            2.) Added a column in the aiml_userdefined table that was missing, which was also
+                preventing new data from being added.
 
 2.3.0   Minor DB refactor, in preparation for version 2.5
             1.) removed the last of the PHP code columns from the database

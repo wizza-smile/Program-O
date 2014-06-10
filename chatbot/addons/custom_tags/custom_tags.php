@@ -2,10 +2,10 @@
 /***************************************
 * www.program-o.com
 * PROGRAM O 
-* Version: 2.3.1
+* Version: 2.4.2
 * FILE: custom_tags.php
 * AUTHOR: Elizabeth Perreau and Dave Morton
-* DATE: MAY 4TH 2011
+* DATE: MAY 17TH 2014
 * DETAILS: this file contains the addon library to process the custom <code> tag
 ***************************************/
 include('code_tag/code_tag.php');
@@ -99,7 +99,7 @@ function parse_wiki_tag($convoArr, $element, $parentName, $level)
   $xml = simplexml_load_string($wikiText, 'SimpleXMLElement', LIBXML_NOCDATA);
   if((string)$xml->Section->Item->Description)
   {
-    $description = (string)$xml->Section->Item->Description ;
+    $description = (string)$xml->Section->Item->Description;
     $image = (string)$xml->Section->Item->Image->asXML();
     $image = str_replace('<Image source', '<img src', $image);
     $linkHref = (string)$xml->Section->Item->Url;

@@ -3,10 +3,10 @@
   /***************************************
   * http://www.program-o.com
   * PROGRAM O
-  * Version: 2.3.1
+  * Version: 2.4.2
   * FILE: library/error_functions.php
   * AUTHOR: Elizabeth Perreau and Dave Morton
-  * DATE: MAY 4TH 2011
+  * DATE: MAY 17TH 2014
   * DETAILS: common library of debugging functions
   ***************************************/
 
@@ -50,22 +50,6 @@
     }
     $current_DateTime = date('m/d/Y H:i:s');
     save_file(_LOG_PATH_ . 'error.log', "$current_DateTime - $info\r\n", true);
-  }
-
-  /**
-  * function sqlErrorHandler()
-  * Process sql errors
-  * @param  string $fileName - the file the error came from
-  * @param  string $functionName - the function that triggered the error
-  * @param  string $line - the line of code
-  * @param  string $sql - the sql query
-  * @param  string $error - the mysql_error
-  * @param  string $erno - the mysql_error
-  **/
-  function sqlErrorHandler($sql, $error, $erno, $file, $function, $line)
-  {
-    $info = "MYSQL ERROR $erno - $error when excuting\n $sql";
-    runDebug($file, $function, $line, $info, 1);
   }
 
   /**
@@ -175,19 +159,18 @@
       $log .= '[NEWLINE]-----------------------[NEWLINE]';
       $log .= 'CONVERSATION ARRAY';
       $log .= '[NEWLINE]-----------------------[NEWLINE]';
-      $log .= print_r($showArr, true);
+      $log .= str_replace("\n", PHP_EOL, print_r($showArr, true));
     }
     switch ($debug_mode)
     {
       case 0 :
         //show in source code
-        $log = str_replace('[NEWLINE]', "\r\n", $log);
+        $log = str_replace('[NEWLINE]', "\n", $log);
         display_on_page(0, $log);
         break;
       case 1 :
         //write to log file
-        $log = str_replace('[NEWLINE]', "\r\n", $log);
-        $log = str_replace("\r\r", "\r", $log);
+        $log = str_replace('[NEWLINE]', PHP_EOL, $log);
         writefile_debug($log, $convoArr);
         break;
       case 2 :
@@ -213,6 +196,7 @@
     runDebug(__FILE__, __FUNCTION__, __LINE__, 'Reducing the conversation array.', 0);
     $showConvoArr = array();
     $showConvoArr['conversation'] = (isset($convoArr['conversation'])) ? $convoArr['conversation'] : '';
+    $showConvoArr['aiml'] = (isset($convoArr['aiml'])) ? $convoArr['aiml'] : '';
     $showConvoArr['topic'][1] = (isset($convoArr['topic'][1])) ? $convoArr['topic'][1] : '';
     $showConvoArr['that'][1] = (isset($convoArr['that'][1])) ? $convoArr['that'][1] : '';
     if (isset($convoArr['star']))

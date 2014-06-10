@@ -2,15 +2,16 @@
 /***************************************
   * http://www.program-o.com
   * PROGRAM O
-  * Version: 2.3.1
+  * Version: 2.4.2
   * FILE: index.php
   * AUTHOR: Elizabeth Perreau and Dave Morton
   * DATE: 07-23-2013
   * DETAILS: This is the interface for the Program O JSON API
   ***************************************/
   $cookie_name = 'Program_O_JSON_GUI';
+  $botId = filter_input(INPUT_GET, 'bot_id');
   $convo_id = (isset($_COOKIE[$cookie_name])) ? $_COOKIE[$cookie_name] : get_convo_id();
-  $bot_id = (isset($_COOKIE['bot_id'])) ? $_COOKIE['bot_id'] : 1; // 1
+  $bot_id = (isset($_COOKIE['bot_id'])) ? $_COOKIE['bot_id'] :($botId !== false && $botId !== null) ? $botId : 1;
   setcookie('bot_id', $bot_id);
   // Experimental code
   $base_URL  = 'http://' . $_SERVER['HTTP_HOST'];                                   // set domain name for the script
@@ -40,8 +41,8 @@
   }
 
 ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en" dir="ltr">
+<!DOCTYPE html>
+<html>
   <head>
     <link rel="stylesheet" type="text/css" href="main.css" media="all" />
     <link rel="icon" href="./favicon.ico" type="image/x-icon" />
@@ -154,6 +155,8 @@
           $('#say').focus();
           $.post('<?php echo $url ?>', formdata, function(data){
             var b = data.botsay;
+            if (b.indexOf('[img]') >= 0) b = showImg(b);
+            if (b.indexOf('[link') >= 0) b = makeLink(b);
             var usersay = data.usersay;
             if (user != usersay) $('.usersay').text(usersay);
             $('.botsay').html(b);
@@ -163,6 +166,20 @@
           return false;
         });
       });
+      function showImg(input) {
+        var regEx = /\[img\](.*?)\[\/img\]/;
+        var repl = '<br><a href="$1" target="_blank"><img src="$1" alt="$1" width="150" /></a>';
+        var out = input.replace(regEx, repl);
+        console.log('out = ' + out);
+        return out
+      }
+      function makeLink(input) {
+        var regEx = /\[link=(.*?)\](.*?)\[\/link\]/;
+        var repl = '<a href="$1" target="_blank">$2</a>';
+        var out = input.replace(regEx, repl);
+        console.log('out = ' + out);
+        return out;
+      }
     </script>
   </body>
 </html>
